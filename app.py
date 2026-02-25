@@ -573,8 +573,17 @@ def apply_final_invoice_rules(doc: Document, rollforward_dt: date) -> None:
 # -----------------------------
 @app.route("/", methods=["GET"])
 def home():
-    return render_template("index.html")
+    return render_template("home.html")
 
+
+@app.route("/invoice", methods=["GET"])
+def invoice_page():
+    return render_template("invoice.html")
+
+
+@app.route("/mgmt-rep", methods=["GET"])
+def mgmt_rep_page():
+    return render_template("mgmt_rep.html")
 
 @app.route("/rollforward", methods=["POST"])
 def rollforward():
