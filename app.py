@@ -66,6 +66,27 @@ PRO_FEES_RE = re.compile(
 # Title line hint
 TITLE_HINT_RE = re.compile(r"\bSOC Audit\b.*\bInvoice\b", re.IGNORECASE)
 
+# Mgmt Rep Letter patterns
+LONG_DATE_RE = re.compile(r"(" + "|".join(MONTHS) + r")\s+(\d{1,2}),\s+(20\d{2})")
+STANDALONE_LONG_DATE_RE = re.compile(
+    r"^\s*((" + "|".join(MONTHS) + r")\s+(\d{1,2}),\s+(20\d{2}))\s*$"
+)
+
+# Review period example: "February 1, 2023 to January 31, 2024"
+REVIEW_PERIOD_RE = re.compile(
+    r"("
+    r"(" + "|".join(MONTHS) + r")\s+(\d{1,2}),\s+(20\d{2})"
+    r"\s+to\s+"
+    r"(" + "|".join(MONTHS) + r")\s+(\d{1,2}),\s+(20\d{2})"
+    r")"
+)
+
+# "as of March 20, 2024" (we replace only the date portion)
+AS_OF_DATE_RE = re.compile(
+    r"(as of\s+)((" + "|".join(MONTHS) + r")\s+(\d{1,2}),\s+(20\d{2}))",
+    re.IGNORECASE
+)
+
 
 # -----------------------------
 # General helpers
@@ -168,6 +189,30 @@ def build_final_output_basename_from_uploaded_filename(uploaded_filename_raw: st
 
     base = re.sub(r"\s+", " ", base).strip()
     return base
+
+
+def build_mgmt_rep_output_filename(raw_uploaded_filename: str) -> str:
+    """
+    Mgmt Rep output naming rule:
+      "Change nothing about the file name except +1 to the year included in the originally uploaded file name."
+    Example:
+      "Management Rep Letter - 2024 Temporary Housing Directory.docx" -> "... 2025 ... .docx"
+    We treat the FIRST 20xx token as the year to increment.
+    """
+    original_base = os.path.splitext(os.path.basename(raw_uploaded_filename))[0]
+    ext = ".docx"  # output is always docx
+
+    year_pat = re.compile(r"(?<!\d)(20\d{2})(?!\d)")
+    m = year_pat.search(original_base)
+    if not m:
+        # If no year is present, do not invent one — keep filename identical and just force .docx
+        return f"{original_base}{ext}"
+
+    old_year = int(m.group(1))
+    new_year = old_year + 1
+    new_base = year_pat.sub(str(new_year), original_base, count=1)
+
+    return f"{new_base}{ext}"
 
 
 def _sanitize_filename_for_windows(name: str) -> str:
@@ -320,6 +365,10 @@ def _replace_value_after_label_preserve_bold(paragraph, label_literal: str, new_
 
 
 def _replace_by_regex_on_full_text_preserve_runs(paragraph, regex: re.Pattern, repl_func) -> bool:
+    """
+    If regex has capturing groups, this function replaces span(1).
+    If regex has no groups, it replaces the full match span.
+    """
     full = _get_runs_text(paragraph)
     matches = list(regex.finditer(full))
     if not matches:
@@ -328,6 +377,26 @@ def _replace_by_regex_on_full_text_preserve_runs(paragraph, regex: re.Pattern, r
     changed = False
     for m in reversed(matches):
         start, end = m.span(1) if m.lastindex else m.span()
+        replacement = repl_func(m)
+        if _replace_span_in_runs(paragraph, start, end, replacement):
+            changed = True
+
+    return changed
+
+
+def _replace_by_regex_group_preserve_runs(paragraph, regex: re.Pattern, group_index: int, repl_func) -> bool:
+    """
+    Replace a specific capturing group span (e.g., group 2) while preserving runs.
+    Useful when you want to keep surrounding text like "as of ".
+    """
+    full = _get_runs_text(paragraph)
+    matches = list(regex.finditer(full))
+    if not matches:
+        return False
+
+    changed = False
+    for m in reversed(matches):
+        start, end = m.span(group_index)
         replacement = repl_func(m)
         if _replace_span_in_runs(paragraph, start, end, replacement):
             changed = True
@@ -510,18 +579,13 @@ def apply_final_invoice_rules(doc: Document, rollforward_dt: date) -> None:
     due_dt = _add_one_month_same_day(rollforward_dt)
     due_date_str = _format_long_date(due_dt)
 
-    # (Optional) Update title inside the document to Invoice 2 (common for final invoices)
-    # If you do NOT want to change the title inside the doc, delete this block.
+    # (Optional) Update title inside the document to Invoice 2
     for p in _iter_all_paragraphs(doc):
         if TITLE_HINT_RE.search(_get_runs_text(p)):
             full = _get_runs_text(p)
             parts = full.split(" - ", 1)
             if len(parts) == 2:
                 client_name = parts[0].strip()
-                # Keep the year as-is inside doc title unless you want it to follow rollforward_dt.year
-                # Most of your finals are for the same engagement year, so we won't change year here.
-                # We will only force Invoice 2.
-                # Try to preserve existing year in title:
                 m_year = re.search(r"(?<!\d)(20\d{2})(?!\d)", full)
                 year_in_title = m_year.group(1) if m_year else str(rollforward_dt.year)
                 new_title = f"{client_name} - {year_in_title} SOC Audit - Invoice 2"
@@ -569,6 +633,57 @@ def apply_final_invoice_rules(doc: Document, rollforward_dt: date) -> None:
 
 
 # -----------------------------
+# Rollforward Rules (Management Rep Letter)
+# -----------------------------
+def apply_mgmt_rep_letter_rules(doc: Document, selected_dt: date) -> None:
+    """
+    Mgmt Rep Letter rules:
+      1) Replace top-of-letter date (standalone "Month Day, Year") with selected date
+         AND replace date portion after "as of " with selected date.
+      2) Roll forward ALL review periods "Month Day, YYYY to Month Day, YYYY" by +1 year.
+      3) Preserve formatting by editing runs only (no paragraph.text assignments).
+    """
+    selected_str = _format_long_date(selected_dt)
+
+    for p in _iter_all_paragraphs(doc):
+        full = _get_runs_text(p)
+
+        if not full or not full.strip():
+            continue
+
+        # Rule #1a: Standalone date line (top of letter style)
+        m_standalone = STANDALONE_LONG_DATE_RE.match(full)
+        if m_standalone:
+            # Replace only the date span (group 1 is the full date)
+            date_text = m_standalone.group(1)
+            idx = full.find(date_text)
+            if idx != -1:
+                _replace_span_in_runs(p, idx, idx + len(date_text), selected_str)
+            continue
+
+        # Rule #1b: "as of <DATE>" (replace only the date group)
+        _replace_by_regex_group_preserve_runs(
+            p,
+            AS_OF_DATE_RE,
+            group_index=2,
+            repl_func=lambda m: selected_str
+        )
+
+        # Rule #2: Review periods by +1 year (replace the whole match (group 1))
+        def _roll_period(m: re.Match) -> str:
+            # groups: 2 month1, 3 day1, 4 year1, 5 month2, 6 day2, 7 year2
+            month1 = m.group(2)
+            day1 = m.group(3)
+            year1 = int(m.group(4)) + 1
+            month2 = m.group(5)
+            day2 = m.group(6)
+            year2 = int(m.group(7)) + 1
+            return f"{month1} {int(day1)}, {year1} to {month2} {int(day2)}, {year2}"
+
+        _replace_by_regex_on_full_text_preserve_runs(p, REVIEW_PERIOD_RE, _roll_period)
+
+
+# -----------------------------
 # Routes
 # -----------------------------
 @app.route("/", methods=["GET"])
@@ -584,6 +699,7 @@ def invoice_page():
 @app.route("/mgmt-rep", methods=["GET"])
 def mgmt_rep_page():
     return render_template("mgmt_rep.html")
+
 
 @app.route("/rollforward", methods=["POST"])
 def rollforward():
@@ -673,6 +789,51 @@ def rollforward():
 
     except Exception as e:
         return f"Rollforward failed: {str(e)}", 500
+
+
+@app.route("/rollforward/mgmt-rep", methods=["POST"])
+def rollforward_mgmt_rep():
+    rollforward_date_raw = (request.form.get("rollforward_date") or "").strip()
+    file = request.files.get("rep_file")
+
+    if not file or file.filename.strip() == "":
+        return "No file uploaded.", 400
+    if not allowed_file(file.filename):
+        return f"File type not allowed. Allowed: {sorted(ALLOWED_EXTENSIONS)}", 400
+    if not rollforward_date_raw:
+        return "Rollforward Date is required.", 400
+
+    try:
+        selected_dt = _parse_rollforward_date(rollforward_date_raw)
+    except Exception:
+        return "Invalid Rollforward Date format.", 400
+
+    raw_uploaded_name = file.filename
+    safe_uploaded_name = secure_filename(file.filename)
+
+    upload_id = uuid.uuid4().hex[:10]
+    uploaded_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{upload_id}__{safe_uploaded_name}")
+    file.save(uploaded_path)
+
+    try:
+        # Convert to DOCX if needed
+        processing_docx_path = convert_to_docx(uploaded_path, app.config["UPLOAD_FOLDER"])
+        doc = Document(processing_docx_path)
+
+        # Apply mgmt rep rules
+        apply_mgmt_rep_letter_rules(doc, selected_dt)
+
+        # Output filename: same as uploaded except first year +1, docx only
+        out_filename = build_mgmt_rep_output_filename(raw_uploaded_name)
+        out_filename_safe = _sanitize_filename_for_windows(out_filename)
+
+        out_docx_path = os.path.join(app.config["OUTPUT_FOLDER"], out_filename_safe)
+        doc.save(out_docx_path)
+
+        return send_file(out_docx_path, as_attachment=True, download_name=os.path.basename(out_docx_path))
+
+    except Exception as e:
+        return f"Mgmt Rep rollforward failed: {str(e)}", 500
 
 
 if __name__ == "__main__":

@@ -4,10 +4,36 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Management Rep Letter Rollforward</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 24px; }
+    .card { max-width: 760px; margin: 0 auto; padding: 18px; border: 1px solid #ddd; border-radius: 12px; }
+    label { display:block; margin-top: 12px; font-weight: 700; }
+    input, select { width: 100%; padding: 10px; margin-top: 8px; }
+    button { margin-top: 16px; padding: 12px 14px; font-weight: 800; cursor:pointer; }
+    a { display:inline-block; margin-top: 14px; }
+    .hint { color:#555; font-size: 13px; margin-top: 6px; line-height: 1.35; }
+  </style>
 </head>
-<body style="font-family: Arial, sans-serif; padding: 24px;">
-  <h1>Management Rep Letter Rollforward</h1>
-  <p>This tool is coming next. Upload your prior-year + current-year rep letters and we’ll build the rules.</p>
-  <p><a href="/">← Back to tool selection</a></p>
+<body>
+  <div class="card">
+    <h1>Management Rep Letter Rollforward</h1>
+    <p class="hint">
+      Upload a prior-year SOC 1 or SOC 2 management rep letter. We’ll roll dates/periods forward and output a new DOCX.
+    </p>
+
+    <form action="/rollforward/mgmt-rep" method="POST" enctype="multipart/form-data">
+      <label for="rollforward_date">Letter Date (Rollforward Date)</label>
+      <input id="rollforward_date" name="rollforward_date" type="date" required />
+      <div class="hint">This replaces the top date and the “as of [DATE]” date in the body.</div>
+
+      <label for="rep_file">Upload Rep Letter (.docx or .doc)</label>
+      <input id="rep_file" name="rep_file" type="file" required />
+      <div class="hint">Allowed: .docx, .doc</div>
+
+      <button type="submit">Rollforward Rep Letter</button>
+    </form>
+
+    <a href="/">← Back to tool selection</a>
+  </div>
 </body>
 </html>
