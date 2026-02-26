@@ -3,3 +3,19 @@ uploads/
 output/
 *.pyc
 .env
+
+# Ignore runtime folders
+uploads/
+output/
+
+# Ignore extracted evidence
+*/evidence_extracted/
+
+# Ignore backup / temp files
+app_backup.py
+app_withoutsummary.py
+templates/*oldversion*.html
+
+# Python cache
+__pycache__/
+*.pyc

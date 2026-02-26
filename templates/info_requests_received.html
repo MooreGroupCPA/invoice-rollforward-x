@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Information Requests Received Review</title>
+  <style>
+    :root{
+      --bg0:#050816; --bg1:#0b122a;
+      --card: rgba(255,255,255,.06);
+      --line: rgba(255,255,255,.14);
+      --text:#e5e7eb; --muted: rgba(229,231,235,.72);
+      --shadow: 0 18px 60px rgba(0,0,0,.55);
+      --radius: 22px;
+
+      --blueGlow: rgba(59,130,246,.35);
+      --purpleGlow: rgba(168,85,247,.30);
+
+      --neon: #39ff14; /* neon green */
+      --warn: #ffcc00;
+      --danger: #ff4d4d;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      min-height:100vh;
+      background:
+        radial-gradient(1200px 600px at 15% 10%, rgba(59,130,246,.25), transparent 55%),
+        radial-gradient(900px 520px at 85% 25%, rgba(168,85,247,.22), transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+    }
+
+    .wrap{ width:min(980px, 92vw); margin:44px auto; padding:26px; }
+    .panel{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:22px;
+      backdrop-filter: blur(14px);
+    }
+
+    h1{ margin:0 0 8px; font-size:28px; }
+    .sub{ margin:0; color:var(--muted); line-height:1.5; }
+
+    .grid{
+      margin-top:16px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:16px;
+    }
+    @media (max-width: 760px){ .grid{ grid-template-columns: 1fr; } }
+
+    .card{
+      background: rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius: 20px;
+      padding:18px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      transition: transform .15s ease, border-color .15s ease;
+    }
+    .card:hover{
+      transform: translateY(-1px);
+      border-color: rgba(59,130,246,.35);
+    }
+
+    label{ display:block; font-weight:800; margin-bottom:8px; letter-spacing:.2px; }
+    input[type="file"]{
+      width:100%;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      outline:none;
+    }
+    input[type="file"]::file-selector-button{
+      margin-right:12px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      transition: transform .12s ease, border-color .12s ease;
+    }
+    input[type="file"]::file-selector-button:hover{
+      transform: translateY(-1px);
+      border-color: rgba(59,130,246,.45);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+    }
+
+    .note{ margin-top:10px; color:var(--muted); font-size:13px; line-height:1.45; }
+
+    .actions{ display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      gap:8px;
+      padding:12px 16px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      font-weight:800;
+      cursor:pointer;
+      text-decoration:none;
+      transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+    .btn:hover{
+      transform: translateY(-1px);
+      border-color: rgba(59,130,246,.45);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+    }
+    .btn.primary{
+      background: linear-gradient(90deg, rgba(59,130,246,.22), rgba(168,85,247,.18));
+      border-color: rgba(59,130,246,.35);
+    }
+
+    .divider{
+      margin:18px 0 0;
+      border-top:1px solid rgba(255,255,255,.10);
+      padding-top:16px;
+    }
+
+    .resultTitle{
+      margin:0 0 10px;
+      font-size:18px;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+
+    .pillRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin:10px 0 14px;
+    }
+    .pill{
+      padding:8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .successNeon{
+      color: var(--neon);
+      font-weight: 900;
+      font-size: 16px;
+      text-shadow: 0 0 10px rgba(57,255,20,.25), 0 0 26px rgba(57,255,20,.18);
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(57,255,20,.22);
+      background: rgba(57,255,20,.06);
+      display:inline-block;
+    }
+
+    .warnBox{
+      border-radius: 16px;
+      border: 1px solid rgba(255,204,0,.25);
+      background: rgba(255,204,0,.06);
+      padding: 12px 14px;
+      box-shadow: 0 0 0 3px rgba(255,204,0,.06);
+    }
+    .warnTitle{
+      color: var(--warn);
+      font-weight: 900;
+      font-size: 16px;
+      text-shadow: 0 0 10px rgba(255,204,0,.18);
+      margin: 0 0 8px;
+    }
+
+    .list{
+      margin: 10px 0 0;
+      padding-left: 18px;
+      line-height:1.55;
+    }
+    .list li{
+      margin: 4px 0;
+    }
+    .cp{
+      display:inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      font-weight: 800;
+      letter-spacing:.2px;
+    }
+
+    .back{
+      display:inline-block;
+      margin-top:16px;
+      text-decoration:none;
+      color: var(--text);
+      font-weight:800;
+      opacity:.92;
+    }
+    .back:hover{ opacity:1; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h1>Information Requests Received Review</h1>
+      <p class="sub">
+        Upload the <strong>Information Requests DOCX</strong> and the <strong>Evidence ZIP</strong>.
+        This tool identifies numeric Control Points with a request (e.g., <em>Provide by FEB 14</em>) and checks whether
+        evidence filenames include those Control Points.
+      </p>
+
+      <form action="/info-requests-received/run" method="POST" enctype="multipart/form-data">
+        <div class="grid">
+          <div class="card">
+            <label for="requests_docx">Information Requests (DOC/DOCX)</label>
+            <input id="requests_docx" name="requests_docx" type="file" accept=".doc,.docx" required />
+            <div class="note">EZ Form (SOC 2) or SOC 1 report/testing matrices containing Control Points.</div>
+          </div>
+
+          <div class="card">
+            <label for="evidence_zip">Client Evidence (ZIP)</label>
+            <input id="evidence_zip" name="evidence_zip" type="file" accept=".zip" required />
+            <div class="note">Filenames can include multiple control points (example: “1.2, 1.4, 1.6 Employee Handbook”).</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" type="submit">⚡ Run Review</button>
+          <a class="btn" href="/">← Back to Hub</a>
+        </div>
+      </form>
+
+      {% if results_ready %}
+      <div class="divider">
+        {% if provided_all %}
+          <div class="resultTitle">Results</div>
+          <div class="successNeon">Client provided 100% of documents requested</div>
+
+          <div class="pillRow">
+            <div class="pill">Requested Control Points: {{ total_requested }}</div>
+            <div class="pill">Missing: 0</div>
+          </div>
+        {% else %}
+          <div class="warnBox">
+            <div class="warnTitle">Missing Control Points Summary (Please Review)</div>
+
+            <div class="pillRow">
+              <div class="pill">Requested Control Points: {{ total_requested }}</div>
+              <div class="pill">Missing: {{ total_missing }}</div>
+            </div>
+
+            {% if total_requested == 0 %}
+              <div class="note">
+                The tool did not detect any request rows. This usually means the table header wording/layout didn’t match expectations.
+                If you want, send me the header row text and I’ll harden detection further.
+              </div>
+            {% elif missing_cps and missing_cps|length > 0 %}
+              <ul class="list">
+                {% for cp in missing_cps %}
+                  <li><span class="cp">{{ cp }}</span></li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="note">No missing control points detected.</div>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        <div class="actions" style="margin-top:14px;">
+          {% if download_url %}
+            <a class="btn primary" href="{{ download_url }}">⬇️ Download Excel</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if results_ready and download_url %}
+  <script>
+    // Auto-trigger Excel download after results render
+    window.addEventListener("load", function() {
+      const url = "{{ download_url }}";
+      if (!url) return;
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  </script>
+  {% endif %}
+</body>
+</html>
