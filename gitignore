@@ -1,21 +1,20 @@
-__pycache__/
-uploads/
-output/
-*.pyc
-.env
-
-# Ignore runtime folders
+# Runtime folders (NEVER commit client data)
 uploads/
 output/
 
-# Ignore extracted evidence
-*/evidence_extracted/
+# Extracted evidence folders
+*__evidence_extracted/
 
-# Ignore backup / temp files
+# Backup / temp app versions
 app_backup.py
 app_withoutsummary.py
+app_best.py
 templates/*oldversion*.html
 
 # Python cache
 __pycache__/
 *.pyc
+
+# OS junk
+.DS_Store
+Thumbs.db
