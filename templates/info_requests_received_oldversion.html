@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Information Requests Received Review</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      color: #111;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+    }
+    .sub {
+      margin: 0 0 22px;
+      color: #555;
+      line-height: 1.4;
+    }
+    .box {
+      background: #fafafa;
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      background: #fff;
+    }
+    .btn {
+      display: inline-block;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: transform .08s ease;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    .note {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #666;
+    }
+    .back {
+      display: inline-block;
+      margin-top: 16px;
+      text-decoration: none;
+      color: #111;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Information Requests Received Review</h1>
+    <p class="sub">
+      Upload the <strong>Information Requests DOCX</strong> (EZ Form or SOC report testing matrices) and the <strong>Evidence ZIP</strong>.
+      This tool finds rows where the <em>Test Results Determined by the Service Auditor</em> cell contains
+      <strong>“Provide by”</strong>, then checks if the evidence ZIP includes files whose names contain matching
+      numeric Control Points (e.g., <code>1.2</code>, <code>6.18</code>). SOC 2 refs like <code>CC6.4</code> are ignored.
+    </p>
+
+    <form action="/info-requests-received/run" method="POST" enctype="multipart/form-data">
+      <div class="box">
+        <label for="requests_docx">Information Requests (DOC/DOCX)</label>
+        <input id="requests_docx" name="requests_docx" type="file" accept=".doc,.docx" required />
+        <div class="note">
+          This is the client’s EZ Form (SOC 2) or the SOC 1 report where info requests appear in the testing matrices.
+        </div>
+      </div>
+
+      <div class="box">
+        <label for="evidence_zip">Client Evidence (ZIP)</label>
+        <input id="evidence_zip" name="evidence_zip" type="file" accept=".zip" required />
+        <div class="note">
+          Filenames can include multiple control points, e.g. “1.2, 1.4, 1.6 Employee Handbook”.
+        </div>
+      </div>
+
+      <button class="btn" type="submit">Run Review</button>
+    </form>
+
+    <a class="back" href="/">← Back to Hub</a>
+  </div>
+</body>
+</html>
