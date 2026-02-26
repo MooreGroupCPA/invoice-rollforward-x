@@ -7,6 +7,8 @@ import subprocess
 import calendar
 from datetime import datetime, date
 from typing import Optional, List, Tuple, Dict
+from functools import wraps
+from flask import request, abort, session
 
 from flask import Flask, render_template, request, send_file
 from werkzeug.utils import secure_filename
@@ -33,6 +35,39 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {"doc", "docx"}
 
 app = Flask(__name__)
+# -----------------------------
+# Access Key Protection (Protected Link)
+# -----------------------------
+APP_ACCESS_KEY = os.environ.get("APP_ACCESS_KEY", "").strip()
+
+# Needed for session cookie (set in Render env too)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
+
+def require_access_key(view_func):
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        # If no key configured, allow (convenient for local dev)
+        if not APP_ACCESS_KEY:
+            return view_func(*args, **kwargs)
+
+        # If already authorized in this browser session, allow
+        if session.get("authorized") is True:
+            return view_func(*args, **kwargs)
+
+        # Allow via querystring on first visit: ?key=...
+        key = (request.args.get("key") or "").strip()
+        if key and key == APP_ACCESS_KEY:
+            session["authorized"] = True
+            return view_func(*args, **kwargs)
+
+        # Allow via header if you ever want it: X-Access-Key: ...
+        hdr = (request.headers.get("X-Access-Key") or "").strip()
+        if hdr and hdr == APP_ACCESS_KEY:
+            session["authorized"] = True
+            return view_func(*args, **kwargs)
+
+        return abort(403)
+    return wrapper
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["OUTPUT_FOLDER"] = OUTPUT_FOLDER
 
@@ -986,27 +1021,32 @@ def _write_csv_report(
 # Routes
 # -----------------------------
 @app.route("/", methods=["GET"])
+@require_access_key
 def home():
     return render_template("home.html")
 
 
 @app.route("/invoice", methods=["GET"])
+@require_access_key
 def invoice_page():
     return render_template("invoice.html")
 
 
 @app.route("/mgmt-rep", methods=["GET"])
+@require_access_key
 def mgmt_rep_page():
     return render_template("mgmt_rep.html")
 
 
 # NEW page route (template you'll add below)
 @app.route("/info-requests-received", methods=["GET"])
+@require_access_key
 def info_requests_received_page():
     return render_template("info_requests_received.html")
 
 
 @app.route("/rollforward", methods=["POST"])
+@require_access_key
 def rollforward():
     invoice_type = request.form.get("invoice_type", "initial").strip().lower()
     rollforward_date_raw = (request.form.get("rollforward_date") or "").strip()
@@ -1097,6 +1137,7 @@ def rollforward():
 
 
 @app.route("/rollforward/mgmt-rep", methods=["POST"])
+@require_access_key
 def rollforward_mgmt_rep():
     rollforward_date_raw = (request.form.get("rollforward_date") or "").strip()
     file = request.files.get("rep_file")
@@ -1144,6 +1185,7 @@ def rollforward_mgmt_rep():
 # NEW: run review
 # NEW: run review
 @app.route("/info-requests-received/run", methods=["POST"])
+@require_access_key
 def info_requests_received_run():
     req_file = request.files.get("requests_docx")
     zip_file = request.files.get("evidence_zip")
@@ -1207,7 +1249,19 @@ def info_requests_received_run():
             requested_items,
             evidence_index
         )
-
+        # -----------------------------
+        # Cleanup uploads/extracted evidence immediately
+        # -----------------------------
+        try:
+            if os.path.exists(req_uploaded_path):
+                os.remove(req_uploaded_path)
+            if os.path.exists(zip_uploaded_path):
+                os.remove(zip_uploaded_path)
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir, ignore_errors=True)
+        except Exception:
+            # Don't fail the request if cleanup fails
+            pass
         # Build missing CP list for UI
         missing_cps = sorted([
             it["control_point"]
@@ -1241,6 +1295,7 @@ def info_requests_received_run():
 
 # NEW: download the generated Excel
 @app.route("/info-requests-received/download/<upload_id>", methods=["GET"])
+@require_access_key
 def info_requests_received_download(upload_id):
     filename = f"Info Requests Received Review - {upload_id}.xlsx"
     path = os.path.join(app.config["OUTPUT_FOLDER"], filename)
@@ -1248,11 +1303,21 @@ def info_requests_received_download(upload_id):
     if not os.path.exists(path):
         return "File not found. Please run the review again.", 404
 
-    return send_file(
+    resp = send_file(
         path,
         as_attachment=True,
         download_name=filename
     )
 
+    # Delete the file after it's sent
+    @resp.call_on_close
+    def _cleanup_output():
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+
+    return resp
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
